@@ -214,7 +214,7 @@ import {getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot} from "https://w
 const firebaseConfig={apiKey:"AIzaSyAo2ZwCB8K3WMJKQXWxPYGoV9T34xvARrU",authDomain:"shop-tracker-5af38.firebaseapp.com",projectId:"shop-tracker-5af38",appId:"1:453182913966:web:6f39975121eee7dc6f1c3f"};
 if(firebaseConfig.apiKey.startsWith("PASTE")){window.setupNeeded()}
 else{
- const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app,"shop-tracker");
  window.FB={user:null,
   set:(n,id,o)=>setDoc(doc(db,C[n],id),o),
   del:(n,id)=>deleteDoc(doc(db,C[n],id)),
