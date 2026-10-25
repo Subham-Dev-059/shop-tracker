@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shop Tracker</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e3e6ea;--ac:#2563eb;--gn:#15803d;--rd:#b91c1c;--am:#b45309;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--card:#1b2027;--tx:#e8ebef;--mu:#99a2ae;--bd:#2c333c;--ac:#6ea0ff;--gn:#4ade80;--rd:#f87171;--am:#fbbf24}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+main{max-width:760px;margin:0 auto;padding:12px 12px 90px}
+h1{font-size:18px;margin:6px 0 10px}h2{font-size:15px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.k{font-size:12px;color:var(--mu)}.v{font-size:20px;font-weight:650}
+.gn{color:var(--gn)}.rd{color:var(--rd)}.am{color:var(--am)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;border:0;background:none;color:var(--mu);padding:10px 2px;font-size:12px}
+nav button.on{color:var(--ac);font-weight:650}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+label{font-size:12px;color:var(--mu);display:block;margin:6px 0 2px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.btn{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:10px 14px;font:inherit;margin-top:10px;width:100%}
+.sm{background:none;border:0;color:var(--rd);padding:2px 6px;font-size:13px}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}th{color:var(--mu);font-weight:500}
+.empty{color:var(--mu);font-size:13px;padding:6px 0}
+.q{background:var(--bg);border:1px solid var(--bd);color:var(--tx);border-radius:16px;padding:5px 10px;font-size:12px;margin:6px 4px 0 0}.hr{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:13px}.hr>span:first-child{width:36%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hr>span:last-child{width:70px;text-align:right}.bar{height:10px;border-radius:5px;background:var(--ac);min-width:2px}.b0{fill:var(--ac)}.b1{fill:var(--gn)}.bn{fill:var(--rd)}.lb{fill:var(--mu);font-size:9px}.lg{font-size:12px;color:var(--mu)}.stk{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:8px 0}</style></head><body><main><h1 id="t"></h1><div id="st" class="k" style="margin:-6px 0 10px"></div><div id="app"></div></main>
+<nav id="nav"></nav>
+<script>
+const K='shoptracker1';
+const EMPTY=()=>({items:[],sales:[],exp:[],fixed:[{n:'Shop rent',a:16000},{n:'Electricity bill',a:2500}],tm:35});
+const C={items:'shop_items',sales:'shop_sales',exp:'shop_expenses',cfg:'shop_settings'};
+let D=EMPTY(),tab='home',live=false,U=[],status='',rf=null,rt=null;
+function norm(x){if(!x.tm)x.tm=35;x.items.forEach(i=>{if(i.recv==null)i.recv=i.stock+x.sales.filter(s=>s.it==i.id).reduce((a,s)=>a+s.q,0)});return x}
+function stat(){const e=document.querySelector('#st');if(e)e.textContent=status}
+function calc(){D.items.forEach(i=>{i.stock=i.recv-D.sales.filter(s=>s.it==i.id).reduce((a,s)=>a+s.q,0)})}
+const err=e=>{status=e&&e.code=='permission-denied'?'⛔ This Google account is not approved. Ask the owner to add your email.':'⚠️ Save failed: '+((e&&(e.message||e.code))||'unknown');stat()};
+const clean=o=>JSON.parse(JSON.stringify(o));
+const iv=i=>clean({n:i.n,cost:i.cost,price:i.price,stock:i.recv,min:i.min});
+function wItem(i){if(live)FB.set('items',i.id,iv(i)).catch(err)}
+function wDoc(n,o){if(live)FB.set(n,o.id,clean({...o,m:o.d.slice(0,7)})).catch(err)}
+function wFix(){if(live)FB.set('cfg','fixed',{list:D.fixed,tm:D.tm}).catch(err)}
+function rm(n,id){if(live)FB.del(n,id).catch(err)}
+async function pushAll(){if(!live)return;try{for(const i of D.items)await FB.set('items',i.id,iv(i));
+ for(const x of D.sales)await FB.set('sales',x.id,clean({...x,m:x.d.slice(0,7)}));
+ for(const x of D.exp)await FB.set('exp',x.id,clean({...x,m:x.d.slice(0,7)}));
+ await FB.set('cfg','fixed',{list:D.fixed,tm:D.tm})}catch(e){err(e)}}
+function save(){}
+function rerender(){const a=document.activeElement;if(!a||!/INPUT|TEXTAREA|SELECT/.test(a.tagName))render();else stat()}
+function sub(n,fn){U.push(FB.watch(n,l=>{fn(l);calc();status='✅ Live shared database · '+FB.user.email;rerender()},err))}
+function showLogin(){live=false;U.forEach(f=>f());U=[];D=EMPTY();document.querySelector('#nav').style.display='none';document.querySelector('#t').textContent='📱 Shop Tracker';status='';stat();
+ document.querySelector('#app').innerHTML='<div class="card"><h2>Sign in</h2><p class="k">Only team members approved by the owner can open this.</p><button class="btn" onclick="FB.login()">Sign in with Google</button></div>'}
+function setupNeeded(){document.querySelector('#nav').style.display='none';document.querySelector('#app').innerHTML='<div class="card"><h2>Setup needed</h2><p class="k">Open index.html and paste your Firebase details into firebaseConfig (see the setup steps).</p></div>'}
+function start(){document.querySelector('#nav').style.display='';D=EMPTY();live=true;status='Loading…';
+ sub('items',l=>{D.items=l.map(x=>({id:x.id,n:x.n,cost:x.cost,price:x.price,min:x.min,recv:x.stock,stock:0}))});
+ sub('sales',l=>{D.sales=l});sub('exp',l=>{D.exp=l});
+ sub('cfg',l=>{const x=l.find(y=>y.id=='fixed');if(x){D.fixed=x.list||[];D.tm=x.tm||35}});render()}
+const $=s=>document.querySelector(s),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const inr=n=>(n<0?'-':'')+'₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=id=>parseFloat($('#'+id).value)||0;
+const cls=n=>n<0?'rd':'gn';
+const TABS=[['home','Home'],['stock','Stock'],['sell','Sell'],['exp','Expenses'],['mo','Months'],['re','Restock']];
+function go(t){tab=t;render()}
+function render(){
+ $('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k==tab?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
+ $('#t').textContent='📱 '+TABS.find(x=>x[0]==tab)[1];
+ $('#app').innerHTML=({home,stock,sell,exp,mo,re})[tab]();stat();
+ if(tab=='sell')pick();
+}
+const profit=s=>(s.p-s.c)*s.q;
+function stats(m){const ss=D.sales.filter(s=>s.d.startsWith(m));
+ const rev=ss.reduce((a,s)=>a+s.p*s.q,0),gp=ss.reduce((a,s)=>a+profit(s),0);
+ const fx=D.fixed.reduce((a,f)=>a+f.a,0),ox=D.exp.filter(e=>e.d.startsWith(m)).reduce((a,e)=>a+e.a,0);
+ return{rev,gp,fx,ox,net:gp-fx-ox,mg:rev?gp/rev*100:0}}
+function lastMonths(n){const o=[],d=new Date();for(let i=n-1;i>=0;i--)o.push(iso(new Date(d.getFullYear(),d.getMonth()-i,1)).slice(0,7));return o}
+function vbars(L,S,K){const all=S.flat();if(!all.some(v=>v))return '<div class="empty">No data yet.</div>';
+ const W=320,H=140,T=10,B=20,n=L.length,mx=Math.max(0,...all),mn=Math.min(0,...all),R=(mx-mn)||1,y=v=>T+(mx-v)/R*(H-T-B),g=W/n,bw=g*.75/S.length;
+ let o=`<svg viewBox="0 0 ${W} ${H}" width="100%"><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="currentColor" opacity=".2"/>`;
+ S.forEach((r,k)=>r.forEach((v,i)=>{o+=`<rect x="${i*g+g*.125+k*bw}" y="${y(Math.max(v,0))}" width="${bw}" height="${Math.max(Math.abs(y(v)-y(0)),v?1:0)}" rx="2" class="${v<0?'bn':K[k]}"><title>${L[i]}: ${inr(v)}</title></rect>`}));
+ L.forEach((l,i)=>{o+=`<text x="${i*g+g/2}" y="${H-6}" text-anchor="middle" class="lb">${l}</text>`});
+ return o+`<text x="2" y="8" class="lb">${inr(mx)}</text></svg>`}
+function charts(){
+ const ms=lastMonths(6),st=ms.map(m=>stats(m)),ml=ms.map(m=>new Date(m+'-15T12:00:00').toLocaleString('en-IN',{month:'short'}));
+ const days=[];for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(iso(d))}
+ const dr=days.map(d=>D.sales.filter(x=>x.d==d).reduce((a,x)=>a+x.p*x.q,0));
+ const agg={};D.sales.forEach(x=>{const k=x.it?x.n:'🔧 Repairs';agg[k]=(agg[k]||0)+profit(x)});
+ const top=Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,5),tm=Math.max(1,...top.map(t=>Math.abs(t[1])));
+ const cm=today().slice(0,7),cs=D.sales.filter(x=>x.d.startsWith(cm)),rp=cs.filter(x=>!x.it).reduce((a,x)=>a+x.p*x.q,0),pr=cs.filter(x=>x.it).reduce((a,x)=>a+x.p*x.q,0),tt=rp+pr;
+ return `<div class="card"><h2>Last 6 months</h2>${vbars(ml,[st.map(t=>t.rev),st.map(t=>t.net)],['b0','b1'])}<div class="lg"><span style="color:var(--ac)">■</span> Revenue &nbsp; <span style="color:var(--gn)">■</span> Net profit (red = loss)</div></div>
+ <div class="card"><h2>Daily sales · last 14 days</h2>${vbars(days.map(d=>d.slice(8)),[dr],['b0'])}</div>
+ <div class="card"><h2>Top earners (all-time profit)</h2>${top.length?top.map(t=>`<div class="hr"><span>${esc(t[0])}</span><div style="flex:1"><div class="bar" style="width:${Math.max(2,Math.abs(t[1])/tm*100)}%;${t[1]<0?'background:var(--rd)':''}"></div></div><span>${inr(t[1])}</span></div>`).join(''):'<div class="empty">No sales yet.</div>'}</div>
+ <div class="card"><h2>This month: repairs vs products</h2>${tt?`<div class="stk"><div style="width:${rp/tt*100}%;background:var(--am)"></div><div style="flex:1;background:var(--ac)"></div></div><div class="lg"><span style="color:var(--am)">■</span> Repairs ${inr(rp)} (${(rp/tt*100).toFixed(0)}%) &nbsp; <span style="color:var(--ac)">■</span> Products ${inr(pr)}</div>`:'<div class="empty">No sales this month.</div>'}</div>`}
+function home(){
+ const m=today().slice(0,7),s=stats(m),td=D.sales.filter(x=>x.d==today());
+ const tr=td.reduce((a,x)=>a+x.p*x.q,0),tp=td.reduce((a,x)=>a+profit(x),0);
+ const need=s.mg>0?(s.fx+s.ox)/(s.mg/100):0,low=restock().length;
+ return `<div class="card"><h2>Today</h2><div class="grid"><div><div class="k">Sales</div><div class="v">${inr(tr)}</div></div><div><div class="k">Profit</div><div class="v ${cls(tp)}">${inr(tp)}</div></div></div></div>
+ <div class="card"><h2>This month</h2><div class="grid">
+ <div><div class="k">Revenue</div><div class="v">${inr(s.rev)}</div></div>
+ <div><div class="k">Gross profit (${s.mg.toFixed(0)}% margin)</div><div class="v">${inr(s.gp)}</div></div>
+ <div><div class="k">Rent + bills + expenses</div><div class="v">${inr(s.fx+s.ox)}</div></div>
+ <div><div class="k">Net profit</div><div class="v ${cls(s.net)}">${inr(s.net)}</div></div></div>
+ <p class="k">${s.mg>0?`To cover all expenses you need about <b>${inr(need)}</b> revenue this month at your current margin. ${s.rev>=need?'You’ve crossed it ✅':'Still to go: '+inr(need-s.rev)}`:'Add sales to see your break-even target.'}</p></div>
+ ${charts()}<div class="card"><h2>Restock</h2><p class="${low?'am':'k'}">${low?low+' item(s) need restocking — see the Restock tab.':'Stock levels look fine.'}</p></div>
+ <div class="card"><h2>Backup</h2><p class="k">Your data is stored in the database automatically. Copy this text as a manual backup; paste it back here to restore.</p>
+ <textarea id="bk" rows="3">${esc(JSON.stringify(D))}</textarea><button class="btn" onclick="restore()">Restore from pasted text</button><button class="btn" style="background:var(--mu)" onclick="FB.out()">Sign out</button></div>`}
+function restore(){try{const x=JSON.parse($('#bk').value);if(x.items&&x.sales&&x.exp&&x.fixed){D=norm(x);calc();pushAll();save();alert('Restored');render()}else alert('Invalid data')}catch(e){alert('Invalid data')}}
+function sug(c){return c>0?Math.ceil(c/(1-D.tm/100)/5)*5:0}
+function sg(){const x=sug(num('c'));$('#sg').innerHTML=x?`Suggested price at ${D.tm}% margin: <b>${inr(x)}</b> <button class="q" onclick="$('#p').value=${x}">Use this</button>`:''}
+function setTm(v){v=parseFloat(v);if(v>0&&v<90){D.tm=v;wFix();save()}render()}
+function setPrice(id,x){const i=D.items.find(y=>y.id==id);i.price=x;wItem(i);save();render()}
+function stock(){
+ const rows=D.items.map(i=>{const mg=i.price?(i.price-i.cost)/i.price*100:0,x=sug(i.cost),low=i.price<x,ss=D.sales.filter(t=>t.it==i.id),ern=ss.reduce((a,t)=>a+profit(t),0),u=ss.reduce((a,t)=>a+t.q,0);
+ return `<tr><td>${esc(i.n)}</td><td>${i.stock}</td><td>${inr(i.cost)}</td><td>${inr(i.price)}</td><td class="${mg<D.tm?'am':'gn'}">${mg.toFixed(0)}% · ${inr(i.price-i.cost)}/unit</td><td class="${low?'am':''}">${inr(x)}</td><td class="${cls(ern)}">${inr(ern)} <span class="k">(${u} sold)</span></td><td>${low?`<button class="sm" style="color:var(--ac)" onclick="setPrice('${i.id}',${x})">Set ${x}</button>`:''}<button class="sm" style="color:var(--ac)" onclick="addQty('${i.id}')">+Qty</button><button class="sm" onclick="delItem('${i.id}')">✕</button></td></tr>`}).join('');
+ const val=D.items.reduce((a,i)=>a+i.stock*i.cost,0);
+ return `<div class="card"><h2>Pricing rule</h2><label>Target margin % (used for suggested prices)</label><input id="tm" type="number" inputmode="decimal" value="${D.tm}" onchange="setTm(this.value)"><p class="k">Suggested price = cost ÷ (1 − margin), rounded up to the next ₹5. Amber means the margin is below your target.</p></div>
+ <div class="card"><h2>Add product</h2>
+ <label>Name</label><input id="n" placeholder="e.g. Type-C cable 1m">
+ <div class="row"><div><label>Cost price ₹</label><input id="c" type="number" inputmode="decimal" oninput="sg()"></div><div><label>Selling price ₹</label><input id="p" type="number" inputmode="decimal"></div></div>
+ <div id="sg" class="k" style="margin-top:6px"></div>
+ <div class="row"><div><label>Stock in hand</label><input id="s" type="number" inputmode="numeric"></div><div><label>Reorder when below</label><input id="m" type="number" inputmode="numeric" value="3"></div></div>
+ <button class="btn" onclick="addItem()">Add product</button></div>
+ <div class="card"><h2>Inventory <span class="k">· stock value ${inr(val)}</span></h2>${D.items.length?`<div class="wrap"><table><tr><th>Item</th><th>Qty</th><th>Cost</th><th>Price</th><th>Margin</th><th>Suggest</th><th>Profit earned</th><th></th></tr>${rows}</table></div>`:'<div class="empty">No products yet.</div>'}</div>`}
+function addItem(){const n=$('#n').value.trim();if(!n)return alert('Enter a name');
+ const it={id:uid(),n,cost:num('c'),price:num('p'),recv:num('s'),stock:0,min:num('m')};D.items.push(it);calc();wItem(it);save();render()}
+function addQty(id){const q=parseFloat(prompt('How many units did you buy?'));if(!q)return;
+ const i=D.items.find(x=>x.id==id),c=parseFloat(prompt('New cost price per unit (leave to keep ₹'+i.cost+')',i.cost));
+ i.recv+=q;if(c>0)i.cost=c;calc();wItem(i);save();render()}
+function delItem(id){if(confirm('Delete this product?')){D.items=D.items.filter(x=>x.id!=id);rm('items',id);save();render()}}
+function sell(){
+ const opts=D.items.map(i=>`<option value="${i.id}">${esc(i.n)} (${i.stock} left)</option>`).join('');
+ const rec=D.sales.slice(-15).reverse().map(s=>`<tr><td>${s.d.slice(5)}</td><td>${esc(s.n)}</td><td>${s.q}</td><td>${inr(s.p*s.q)}</td><td class="${cls(profit(s))}">${inr(profit(s))}</td><td><button class="sm" onclick="delSale('${s.id}')">✕</button></td></tr>`).join('');
+ return `<div class="card"><h2>Record a sale / repair</h2>
+ <label>What was sold?</label><select id="w" onchange="pick()"><option value="svc">🔧 Repair / service</option>${opts}</select>
+ <div id="sv"><label>Description</label><input id="d" placeholder="e.g. Screen replacement, Redmi Note 11"></div>
+ <div class="row"><div><label>Qty</label><input id="q" type="number" value="1" inputmode="numeric"></div><div><label>Price ₹ (each)</label><input id="pp" type="number" inputmode="decimal"></div><div><label id="cl">Parts cost ₹</label><input id="cc" type="number" inputmode="decimal" value="0"></div></div>
+ <label>Date</label><input id="dt" type="date" value="${today()}">
+ <button class="btn" onclick="addSale()">Save sale</button></div>
+ <div class="card"><h2>Recent</h2>${rec?`<div class="wrap"><table><tr><th>Date</th><th>Item</th><th>Qty</th><th>Amt</th><th>Profit</th><th></th></tr>${rec}</table></div>`:'<div class="empty">No sales yet.</div>'}</div>`}
+function pick(){const w=$('#w').value,svc=w=='svc';$('#sv').style.display=svc?'':'none';$('#cl').textContent=svc?'Parts cost ₹':'Cost ₹ (auto)';
+ $('#cc').disabled=!svc;if(!svc){const i=D.items.find(x=>x.id==w);$('#pp').value=i.price;$('#cc').value=i.cost}}
+function addSale(){const w=$('#w').value,q=num('q')||1,p=num('pp'),d=$('#dt').value||today();let s;
+ if(w=='svc'){s={id:uid(),d,n:$('#d').value.trim()||'Repair',q:1,p,c:num('cc'),svc:1}}
+ else{const i=D.items.find(x=>x.id==w);if(q>i.stock&&!confirm('Only '+i.stock+' in stock. Continue?'))return;
+  s={id:uid(),d,n:i.n,q,p,c:i.cost,it:i.id}}
+ D.sales.push(s);calc();wDoc('sales',s);save();render()}
+function delSale(id){const s=D.sales.find(x=>x.id==id);if(!confirm('Delete this sale?'))return;
+ D.sales=D.sales.filter(x=>x.id!=id);calc();rm('sales',id);save();render()}
+function exp(){const m=today().slice(0,7),s=stats(m);
+ const fx=D.fixed.map((f,k)=>`<tr><td>${esc(f.n)}</td><td>${inr(f.a)}</td><td><button class="sm" onclick="editFx(${k})">Edit</button><button class="sm" onclick="delFx(${k})">✕</button></td></tr>`).join('');
+ const ox=D.exp.filter(e=>e.d.startsWith(m)).reverse().map(e=>`<tr><td>${e.d.slice(5)}</td><td>${esc(e.n)}</td><td>${inr(e.a)}</td><td><button class="sm" onclick="delExp('${e.id}')">✕</button></td></tr>`).join('');
+ return `<div class="card"><h2>Monthly fixed costs <span class="k">· ${inr(s.fx)}</span></h2><table>${fx}</table>
+ <div class="row"><input id="fn" placeholder="e.g. Staff salary"><input id="fa" type="number" placeholder="₹ / month"></div><button class="btn" onclick="addFx()">Add fixed cost</button></div>
+ <div class="card"><h2>One-time expenses</h2><div class="row"><input id="en" placeholder="e.g. Tools, Chai, Packaging"><input id="ea" type="number" placeholder="₹"></div>
+ <button class="btn" onclick="addExp()">Add expense</button></div>
+ <div class="card"><h2>This month’s expenses <span class="k">· ${inr(s.ox)}</span></h2>${ox?`<table>${ox}</table>`:'<div class="empty">None yet.</div>'}</div>`}
+function addFx(){const n=$('#fn').value.trim(),a=num('fa');if(!n||!a)return;D.fixed.push({n,a});wFix();save();render()}
+function editFx(k){const a=parseFloat(prompt('New monthly amount',D.fixed[k].a));if(a>=0){D.fixed[k].a=a;wFix();save();render()}}
+function delFx(k){D.fixed.splice(k,1);wFix();save();render()}
+function addExp(){const n=$('#en').value.trim(),a=num('ea');if(!n||!a)return;const e={id:uid(),d:today(),n,a};D.exp.push(e);wDoc('exp',e);save();render()}
+function delExp(id){D.exp=D.exp.filter(e=>e.id!=id);rm('exp',id);save();render()}
+
+function months(){const s=new Set([today().slice(0,7)]);D.sales.forEach(x=>s.add(x.d.slice(0,7)));D.exp.forEach(x=>s.add(x.d.slice(0,7)));return[...s].sort().reverse()}
+const mname=m=>new Date(m+'-15T12:00:00').toLocaleString('en-IN',{month:'short',year:'numeric'});
+const mEnd=m=>{const [y,mm]=m.split('-');return m+'-'+String(new Date(+y,+mm,0).getDate()).padStart(2,'0')};
+const iso=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+function setR(a,b){if(a&&b){rf=a;rt=b<a?a:b}render()}
+function qr(k){const n=new Date(),t=iso(n);let a=t,b=t;
+ if(k=='w'){const d=new Date(n);d.setDate(d.getDate()-6);a=iso(d)}
+ else if(k=='m')a=t.slice(0,7)+'-01';
+ else if(k=='l'){a=iso(new Date(n.getFullYear(),n.getMonth()-1,1));b=mEnd(a.slice(0,7))}
+ else if(k=='a')a=D.sales.concat(D.exp).map(x=>x.d).sort()[0]||t;
+ setR(a,b)}
+function rs(){const ss=D.sales.filter(x=>x.d>=rf&&x.d<=rt),es=D.exp.filter(x=>x.d>=rf&&x.d<=rt);
+ const rev=ss.reduce((a,x)=>a+x.p*x.q,0),gp=ss.reduce((a,x)=>a+profit(x),0),ox=es.reduce((a,x)=>a+x.a,0),fm=D.fixed.reduce((a,f)=>a+f.a,0);
+ let fx=0;for(let d=new Date(rf+'T12:00:00'),e=new Date(rt+'T12:00:00');d<=e;d.setDate(d.getDate()+1))fx+=fm/new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+ return{ss,es,rev,gp,ox,fx,net:gp-fx-ox,mg:rev?gp/rev*100:0}}
+function mo(){const ms=months();if(!rf){rf=today().slice(0,7)+'-01';rt=today()}
+ const rows=ms.map(m=>{const t=stats(m);return `<tr onclick="setR('${m}-01','${mEnd(m)}')" style="cursor:pointer"><td>${mname(m)}</td><td>${inr(t.rev)}</td><td>${inr(t.gp)}</td><td>${inr(t.fx+t.ox)}</td><td class="${cls(t.net)}">${inr(t.net)}</td></tr>`}).join('');
+ const r=rs();
+ const sr=r.ss.slice().sort((a,b)=>a.d<b.d?1:-1).map(x=>`<tr><td>${x.d.slice(5)}</td><td>${esc(x.n)}</td><td>${x.q}</td><td>${inr(x.p*x.q)}</td><td class="${cls(profit(x))}">${inr(profit(x))}</td></tr>`).join('');
+ const er=r.es.slice().sort((a,b)=>a.d<b.d?1:-1).map(x=>`<tr><td>${x.d.slice(5)}</td><td>${esc(x.n)}</td><td>${inr(x.a)}</td></tr>`).join('');
+ return `<div class="card"><h2>Date range</h2><div class="row"><div><label>From</label><input id="rf" type="date" value="${rf}" onchange="setR(this.value,$('#rt').value)"></div><div><label>To</label><input id="rt" type="date" value="${rt}" onchange="setR($('#rf').value,this.value)"></div></div>
+ <button class="q" onclick="qr('t')">Today</button><button class="q" onclick="qr('w')">Last 7 days</button><button class="q" onclick="qr('m')">This month</button><button class="q" onclick="qr('l')">Last month</button><button class="q" onclick="qr('a')">All time</button></div>
+ <div class="card"><div class="grid"><div><div class="k">Revenue</div><div class="v">${inr(r.rev)}</div></div><div><div class="k">Gross profit (${r.mg.toFixed(0)}%)</div><div class="v">${inr(r.gp)}</div></div>
+ <div><div class="k">Rent, bills &amp; expenses</div><div class="v">${inr(r.fx+r.ox)}</div></div><div><div class="k">Net profit</div><div class="v ${cls(r.net)}">${inr(r.net)}</div></div></div>
+ <p class="k">Monthly rent and bills are counted per day for the dates chosen.</p>
+ <h2 style="margin-top:12px">Sales &amp; repairs</h2>${sr?`<div class="wrap"><table><tr><th>Date</th><th>Item</th><th>Qty</th><th>Amt</th><th>Profit</th></tr>${sr}</table></div>`:'<div class="empty">None.</div>'}
+ <h2 style="margin-top:12px">Expenses</h2>${er?`<table><tr><th>Date</th><th>For</th><th>Amt</th></tr>${er}</table>`:'<div class="empty">None.</div>'}</div>
+ <div class="card"><h2>Month by month</h2><div class="wrap"><table><tr><th>Month</th><th>Revenue</th><th>Profit</th><th>Costs</th><th>Net</th></tr>${rows}</table></div><p class="k">Tap a month to select its dates.</p></div>
+ <div class="card"><h2>Export to Excel</h2><p class="k">Saves a .csv that opens in Excel or Google Sheets.</p>
+ <button class="btn" onclick="exMonthly()">Monthly summary</button><button class="btn" onclick="exSales()">Sales &amp; repairs in selected dates</button><button class="btn" onclick="exStock()">Inventory</button></div>`}
+const csv=r=>r.map(x=>x.map(c=>{c=String(c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(',')).join('\n');
+function dl(n,r){const b=new Blob(['\ufeff'+csv(r)],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.appendChild(a);a.click();a.remove()}
+function exMonthly(){dl('monthly-summary.csv',[['Month','Revenue','Gross profit','Margin %','Fixed costs','Other expenses','Net profit'],...months().slice().reverse().map(m=>{const s=stats(m);return[m,s.rev,s.gp,s.mg.toFixed(1),s.fx,s.ox,s.net]})])}
+function exSales(){dl('sales-'+rf+'_to_'+rt+'.csv',[['Date','Item','Qty','Unit price','Unit cost','Total','Profit'],...D.sales.filter(x=>x.d>=rf&&x.d<=rt).sort((a,b)=>a.d<b.d?-1:1).map(x=>[x.d,x.n,x.q,x.p,x.c,x.p*x.q,profit(x)])])}
+function exStock(){dl('inventory.csv',[['Item','Stock','Cost','Price','Margin %'],...D.items.map(i=>[i.n,i.stock,i.cost,i.price,i.price?((i.price-i.cost)/i.price*100).toFixed(1):0])])}
+function restock(){const from=new Date(Date.now()-30*864e5).toISOString().slice(0,10),out=[];
+ D.items.forEach(i=>{const sold=D.sales.filter(s=>s.it==i.id&&s.d>=from).reduce((a,s)=>a+s.q,0),dr=sold/30,days=dr>0?i.stock/dr:Infinity;
+  if(i.stock<=i.min||days<7){const need=Math.max(Math.ceil(dr*21)-i.stock,i.min*2-i.stock,1);out.push({i,sold,days,need})}});
+ return out.sort((a,b)=>a.days-b.days)}
+function re(){const r=restock(),tot=r.reduce((a,x)=>a+x.need*x.i.cost,0);
+ const rows=r.map(x=>`<tr><td>${esc(x.i.n)}</td><td>${x.i.stock}</td><td>${x.sold}</td><td>${x.days===Infinity?'–':Math.round(x.days)+'d'}</td><td><b>${x.need}</b></td><td>${inr(x.need*x.i.cost)}</td></tr>`).join('');
+ return `<div class="card"><h2>Suggested restock list</h2><p class="k">Flags items at or below their reorder level, or likely to run out within 7 days based on the last 30 days of sales. Suggested quantity covers about 3 weeks.</p>
+ ${r.length?`<div class="wrap"><table><tr><th>Item</th><th>Stock</th><th>Sold 30d</th><th>Lasts</th><th>Buy</th><th>Cost</th></tr>${rows}</table></div><p><b>Estimated spend: ${inr(tot)}</b></p>`:'<div class="empty">Nothing to restock right now 👍</div>'}</div>`}
+</script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// PASTE YOUR FIREBASE DETAILS HERE
+const firebaseConfig={apiKey:"AIzaSyAo2ZwCB8K3WMJKQXWxPYGoV9T34xvARrU",authDomain:"shop-tracker-5af38.firebaseapp.com",projectId:"shop-tracker-5af38",appId:"1:453182913966:web:6f39975121eee7dc6f1c3f"};
+if(firebaseConfig.apiKey.startsWith("PASTE")){window.setupNeeded()}
+else{
+ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+ window.FB={user:null,
+  set:(n,id,o)=>setDoc(doc(db,C[n],id),o),
+  del:(n,id)=>deleteDoc(doc(db,C[n],id)),
+  watch:(n,cb,eb)=>onSnapshot(collection(db,C[n]),sn=>cb(sn.docs.map(d=>({...d.data(),id:d.id}))),eb),
+  login:()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>alert(e.message)),
+  out:()=>signOut(auth)};
+ onAuthStateChanged(auth,u=>{FB.user=u;u?window.start():window.showLogin()});
+}
+</script>
+</body></html>
